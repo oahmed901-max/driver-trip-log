@@ -100,7 +100,7 @@ def render_trips_tab():
 
 
 def render_drivers_tab():
-    st.subheader("إAdd New Driver")
+    st.subheader("Add New Driver")
     with st.form("add_driver_form", clear_on_submit=True):
         name = st.text_input("Driver Name")
         submitted = st.form_submit_button("Add + Generate Link")
@@ -109,7 +109,7 @@ def render_drivers_tab():
             st.success("Driver added")
             st.rerun()
 
-    st.subheader("اCurrent Drivers")
+    st.subheader("Current Drivers")
     drivers = get_drivers()
     base_url = st.secrets.get("APP_BASE_URL", "")
     if not drivers:
