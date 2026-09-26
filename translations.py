@@ -2,6 +2,7 @@ TRANSLATIONS = {
     "en": {
         "start_trip_heading": "Start a new trip",
         "no_vehicles": "No vehicles added yet. Please contact the supervisor.",
+        "no_authorized_vehicles": "You are not authorized to drive any vehicle yet. Please contact the supervisor.",
         "vehicle": "Vehicle",
         "current_odometer": "Current odometer reading",
         "start_trip_btn": "Start Trip",
@@ -12,6 +13,7 @@ TRANSLATIONS = {
         "odometer_at_start": "Odometer reading at start",
         "odometer_now": "Current odometer reading",
         "destination": "Destination",
+        "select_placeholder": "-- Select --",
         "other": "Other",
         "enter_destination": "Enter the destination",
         "department": "Entity / Department",
@@ -24,10 +26,14 @@ TRANSLATIONS = {
         "trip_cancelled": "Trip cancelled ✓",
         "save_error": "An error occurred while saving: {error}",
         "invalid_link": "This link is invalid or the driver is inactive. Please contact the supervisor.",
+        "error_odometer_required": "Please enter the current odometer reading.",
+        "error_destination_required": "Please select a destination.",
+        "error_destination_other_required": "Please type the destination.",
     },
     "ur": {
         "start_trip_heading": "نئی ٹرپ شروع کریں",
         "no_vehicles": "ابھی تک کوئی گاڑی شامل نہیں کی گئی۔ براہ کرم سپروائزر سے رابطہ کریں۔",
+        "no_authorized_vehicles": "ابھی آپ کو کوئی گاڑی چلانے کی اجازت نہیں ہے۔ براہ کرم سپروائزر سے رابطہ کریں۔",
         "vehicle": "گاڑی",
         "current_odometer": "موجودہ اوڈومیٹر ریڈنگ",
         "start_trip_btn": "ٹرپ شروع کریں",
@@ -38,6 +44,7 @@ TRANSLATIONS = {
         "odometer_at_start": "شروع میں اوڈومیٹر ریڈنگ",
         "odometer_now": "موجودہ اوڈومیٹر ریڈنگ",
         "destination": "منزل",
+        "select_placeholder": "-- منتخب کریں --",
         "other": "دیگر",
         "enter_destination": "منزل لکھیں",
         "department": "شخص / شعبہ",
@@ -50,6 +57,9 @@ TRANSLATIONS = {
         "trip_cancelled": "ٹرپ منسوخ ہو گئی ✓",
         "save_error": "محفوظ کرتے وقت خرابی پیش آئی: {error}",
         "invalid_link": "یہ لنک غلط ہے یا ڈرائیور غیر فعال ہے۔ براہ کرم سپروائزر سے رابطہ کریں۔",
+        "error_odometer_required": "براہ کرم موجودہ اوڈومیٹر ریڈنگ درج کریں۔",
+        "error_destination_required": "براہ کرم منزل منتخب کریں۔",
+        "error_destination_other_required": "براہ کرم منزل لکھیں۔",
     },
 }
 
