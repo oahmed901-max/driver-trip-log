@@ -6,31 +6,35 @@ from db import (
     get_vehicle,
     start_trip,
     close_trip,
+    cancel_trip,
     get_destinations,
     get_departments,
 )
+from translations import t
 
 
 def render_driver_view(token):
     driver = get_driver_by_token(token)
     if not driver:
-        st.error("This link is invalid or the driver is inactive. Please contact the supervisor.")
+        st.error(t("en", "invalid_link"))
         return
+
+    lang = driver.get("language") or "en"
 
     st.title(f"🚚 {driver['name']}")
     open_trip = get_open_trip(driver["id"])
 
     if open_trip:
-        render_end_trip_form(open_trip)
+        render_end_trip_form(open_trip, lang)
     else:
-        render_start_trip_form(driver)
+        render_start_trip_form(driver, lang)
 
 
-def render_start_trip_form(driver):
-    st.subheader("Start a new trip")
+def render_start_trip_form(driver, lang):
+    st.subheader(t(lang, "start_trip_heading"))
     vehicles = get_vehicles()
     if not vehicles:
-        st.warning("No vehicles added yet. Please contact the supervisor.")
+        st.warning(t(lang, "no_vehicles"))
         return
 
     default_idx = 0
@@ -40,53 +44,66 @@ def render_start_trip_form(driver):
             default_idx = ids.index(driver["primary_vehicle_id"])
 
     vehicle = st.selectbox(
-        "Vehicle", vehicles, index=default_idx, format_func=lambda v: v["vehicle_number"]
+        t(lang, "vehicle"), vehicles, index=default_idx, format_func=lambda v: v["vehicle_number"]
     )
-    st.metric("Current odometer reading", f"{vehicle['current_odometer']:,.0f} كم")
+    st.metric(t(lang, "current_odometer"), f"{vehicle['current_odometer']:,.0f} km")
 
-    if st.button("Start Trip", type="primary", use_container_width=True):
+    if st.button(t(lang, "start_trip_btn"), type="primary", use_container_width=True):
         trip = start_trip(driver["id"], vehicle["id"], vehicle["current_odometer"])
         if trip:
-            st.success("Start Trip ✓")
+            st.success(t(lang, "trip_started"))
             st.rerun()
         else:
-            st.error("An error occurred while starting the trip. Please try again.")
+            st.error(t(lang, "start_trip_error"))
 
 
-def render_end_trip_form(trip):
+def render_end_trip_form(trip, lang):
     vehicle = get_vehicle(trip["vehicle_id"])
-    st.subheader("End Current Trip")
+    st.subheader(t(lang, "end_trip_heading"))
     start_clock = trip["start_time"][11:16] if trip.get("start_time") else ""
-    st.info(f"Vehicle: {vehicle['vehicle_number']} — Started at  {start_clock}")
-    st.metric("Odometer reading at start", f"{trip['start_odometer']:,.0f}")
+    st.info(t(lang, "started_at", vehicle=vehicle["vehicle_number"], time=start_clock))
+    st.metric(t(lang, "odometer_at_start"), f"{trip['start_odometer']:,.0f} km")
 
     end_km = st.number_input(
-        "Current odometer reading", min_value=float(trip["start_odometer"]), step=1.0
+        t(lang, "odometer_now"), min_value=float(trip["start_odometer"]), step=1.0
     )
 
     destinations = get_destinations()
-    dest_names = [d["name"] for d in destinations] + ["Other"]
-    dest_choice = st.selectbox("Destination", dest_names)
+    dest_names = [d["name"] for d in destinations] + [t(lang, "other")]
+    dest_choice = st.selectbox(t(lang, "destination"), dest_names)
     dest_id, dest_other = None, None
-    if dest_choice == "Other":
-        dest_other = st.text_input("Enter the destination")
+    if dest_choice == t(lang, "other"):
+        dest_other = st.text_input(t(lang, "enter_destination"))
     else:
         dest_id = next(d["id"] for d in destinations if d["name"] == dest_choice)
 
     departments = get_departments()
-    dept_names = [d["name"] for d in departments] + ["Not specified"]
-    dept_choice = st.selectbox("Entity / Department", dept_names)
+    dept_names = [d["name"] for d in departments] + [t(lang, "not_specified")]
+    dept_choice = st.selectbox(t(lang, "department"), dept_names)
     dept_id = None
-    if dept_choice != "Not specified":
+    if dept_choice != t(lang, "not_specified"):
         dept_id = next(d["id"] for d in departments if d["name"] == dept_choice)
 
-    person_name = st.text_input("Person's name (optional)")
+    person_name = st.text_input(t(lang, "person_name"))
+    remark = st.text_area(t(lang, "remark"))
 
-    if st.button("End Trip", type="primary", use_container_width=True):
-        try:
-            close_trip(trip["id"], end_km, dest_id, dest_other, dept_id, person_name)
-            distance = end_km - trip["start_odometer"]
-            st.success(f"Trip recorded successfully — Distance: {distance} km ✓")
-            st.rerun()
-        except Exception as e:
-            st.error(f" An error occurred while saving: {e}")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button(t(lang, "end_trip_btn"), type="primary", use_container_width=True):
+            try:
+                close_trip(trip["id"], end_km, dest_id, dest_other, dept_id, person_name, remark or None)
+                distance = end_km - trip["start_odometer"]
+                st.success(t(lang, "trip_ended", distance=f"{distance:,.0f}"))
+                st.rerun()
+            except Exception as e:
+                st.error(t(lang, "save_error", error=e))
+
+    with col2:
+        if st.button(t(lang, "cancel_trip_btn"), use_container_width=True):
+            try:
+                cancel_trip(trip["id"], remark or None)
+                st.success(t(lang, "trip_cancelled"))
+                st.rerun()
+            except Exception as e:
+                st.error(t(lang, "save_error", error=e))
