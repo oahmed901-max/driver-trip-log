@@ -23,15 +23,31 @@ def get_drivers():
     return sb.table("drivers").select("*").order("created_at", desc=True).execute().data
 
 
-def add_driver(name, employee_id=None):
+def add_driver(name, employee_id=None, job_title=None, phone_number=None,
+                company_name=None, license_number=None, license_category=None,
+                license_expiry=None, language="en"):
     sb = get_client()
     token = pysecrets.token_urlsafe(12)
     res = sb.table("drivers").insert({
         "name": name,
-        "employee_id": employee_id,
+        "employee_id": employee_id or None,
+        "job_title": job_title or None,
+        "phone_number": phone_number or None,
+        "company_name": company_name or None,
+        "license_number": license_number or None,
+        "license_category": license_category or None,
+        "license_expiry": license_expiry.isoformat() if license_expiry else None,
+        "language": language,
         "unique_token": token,
     }).execute()
     return res.data[0] if res.data else None
+
+
+def update_driver(driver_id, **fields):
+    sb = get_client()
+    if fields.get("license_expiry") is not None and hasattr(fields["license_expiry"], "isoformat"):
+        fields["license_expiry"] = fields["license_expiry"].isoformat()
+    sb.table("drivers").update(fields).eq("id", driver_id).execute()
 
 
 def set_driver_active(driver_id, active):
@@ -66,6 +82,11 @@ def add_vehicle(vehicle_number, current_odometer=0, plate_number=None, vehicle_t
     return res.data[0] if res.data else None
 
 
+def update_vehicle(vehicle_id, **fields):
+    sb = get_client()
+    sb.table("vehicles").update(fields).eq("id", vehicle_id).execute()
+
+
 def set_vehicle_active(vehicle_id, active):
     sb = get_client()
     sb.table("vehicles").update({"active": active}).eq("id", vehicle_id).execute()
@@ -83,6 +104,11 @@ def add_destination(name):
     sb.table("destinations").insert({"name": name}).execute()
 
 
+def update_destination(destination_id, name):
+    sb = get_client()
+    sb.table("destinations").update({"name": name}).eq("id", destination_id).execute()
+
+
 def get_departments():
     sb = get_client()
     return sb.table("departments").select("*").eq("active", True).order("name").execute().data
@@ -91,6 +117,11 @@ def get_departments():
 def add_department(name):
     sb = get_client()
     sb.table("departments").insert({"name": name}).execute()
+
+
+def update_department(department_id, name):
+    sb = get_client()
+    sb.table("departments").update({"name": name}).eq("id", department_id).execute()
 
 
 # ---------- Trips ----------
@@ -120,7 +151,7 @@ def start_trip(driver_id, vehicle_id, start_odometer):
     return res.data[0] if res.data else None
 
 
-def close_trip(trip_id, end_odometer, destination_id, destination_other, department_id, person_name):
+def close_trip(trip_id, end_odometer, destination_id, destination_other, department_id, person_name, notes=None):
     sb = get_client()
     return sb.rpc("close_trip", {
         "p_trip_id": trip_id,
@@ -129,6 +160,25 @@ def close_trip(trip_id, end_odometer, destination_id, destination_other, departm
         "p_destination_other": destination_other,
         "p_department_id": department_id,
         "p_person_name": person_name,
+        "p_notes": notes,
+    }).execute()
+
+
+def cancel_trip(trip_id, notes=None):
+    sb = get_client()
+    return sb.rpc("cancel_trip", {
+        "p_trip_id": trip_id,
+        "p_notes": notes,
+    }).execute()
+
+
+def correct_trip_odometer(trip_id, new_start_odometer, new_end_odometer, reason):
+    sb = get_client()
+    return sb.rpc("correct_trip_odometer", {
+        "p_trip_id": trip_id,
+        "p_new_start_odometer": new_start_odometer,
+        "p_new_end_odometer": new_end_odometer,
+        "p_reason": reason,
     }).execute()
 
 
