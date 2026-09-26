@@ -25,7 +25,7 @@ def get_drivers():
 
 def add_driver(name, employee_id=None, job_title=None, phone_number=None,
                 company_name=None, license_number=None, license_category=None,
-                license_expiry=None, language="en"):
+                license_expiry=None, language="en", primary_vehicle_id=None):
     sb = get_client()
     token = pysecrets.token_urlsafe(12)
     res = sb.table("drivers").insert({
@@ -38,6 +38,7 @@ def add_driver(name, employee_id=None, job_title=None, phone_number=None,
         "license_category": license_category or None,
         "license_expiry": license_expiry.isoformat() if license_expiry else None,
         "language": language,
+        "primary_vehicle_id": primary_vehicle_id,
         "unique_token": token,
     }).execute()
     return res.data[0] if res.data else None
@@ -53,6 +54,28 @@ def update_driver(driver_id, **fields):
 def set_driver_active(driver_id, active):
     sb = get_client()
     sb.table("drivers").update({"active": active}).eq("id", driver_id).execute()
+
+
+# ---------- Driver ↔ Vehicle authorization ----------
+
+def get_authorized_vehicle_ids(driver_id):
+    sb = get_client()
+    res = (
+        sb.table("driver_vehicle_authorizations")
+        .select("vehicle_id")
+        .eq("driver_id", driver_id)
+        .eq("active", True)
+        .execute()
+    )
+    return [r["vehicle_id"] for r in res.data] if res.data else []
+
+
+def set_driver_authorized_vehicles(driver_id, vehicle_ids):
+    sb = get_client()
+    sb.table("driver_vehicle_authorizations").delete().eq("driver_id", driver_id).execute()
+    if vehicle_ids:
+        rows = [{"driver_id": driver_id, "vehicle_id": vid} for vid in vehicle_ids]
+        sb.table("driver_vehicle_authorizations").insert(rows).execute()
 
 
 # ---------- Vehicles ----------
@@ -132,8 +155,7 @@ def get_open_trip(driver_id):
         sb.table("trips")
         .select("*")
         .eq("driver_id", driver_id)
-        .eq("status", "active")
-        .is_("end_odometer", "null")
+        .eq("status", "in_progress")
         .order("start_time", desc=True)
         .limit(1)
         .execute()
