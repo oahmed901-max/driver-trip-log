@@ -1,3 +1,4 @@
+from datetime import datetime
 from io import BytesIO
 
 import pandas as pd
@@ -8,6 +9,8 @@ from db import (
     add_driver,
     update_driver,
     set_driver_active,
+    get_authorized_vehicle_ids,
+    set_driver_authorized_vehicles,
     get_vehicles,
     add_vehicle,
     update_vehicle,
@@ -22,6 +25,27 @@ from db import (
     correct_trip_odometer,
 )
 from qr_utils import make_qr_bytes
+
+
+def format_dt(iso_str):
+    if not iso_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        return dt.strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        return iso_str
+
+
+def format_duration(minutes):
+    if minutes is None:
+        return ""
+    try:
+        total = int(round(float(minutes)))
+        h, m = divmod(total, 60)
+        return f"{h}h {m}m" if h else f"{m}m"
+    except Exception:
+        return ""
 
 
 def check_login():
@@ -75,8 +99,9 @@ def render_trips_tab():
             "Start KM": t.get("start_odometer"),
             "End KM": t.get("end_odometer"),
             "Distance (km)": t.get("distance"),
-            "Start Time": t.get("start_time"),
-            "End Time": t.get("end_time"),
+            "Start Time": format_dt(t.get("start_time")),
+            "End Time": format_dt(t.get("end_time")),
+            "Duration": format_duration(t.get("duration_minutes")),
             "Destination": (t.get("destinations") or {}).get("name") or t.get("destination_other"),
             "Department": (t.get("departments") or {}).get("name"),
             "Person": t.get("person_name"),
@@ -90,7 +115,7 @@ def render_trips_tab():
     with col1:
         driver_filter = st.text_input("Search by driver name")
     with col2:
-        status_filter = st.selectbox("Status", ["All", "active", "cancelled", "corrected"])
+        status_filter = st.selectbox("Status", ["All", "in_progress", "completed", "cancelled", "corrected"])
 
     filtered = df.copy()
     if driver_filter:
@@ -163,6 +188,9 @@ def render_correction_section(trips):
 # =====================================================================
 
 def render_drivers_tab():
+    all_vehicles = get_vehicles(active_only=False)
+    vehicle_options = {v["vehicle_number"]: v["id"] for v in all_vehicles}
+
     st.subheader("Add a new driver")
     with st.form("add_driver_form", clear_on_submit=True):
         name = st.text_input("Driver name")
@@ -176,11 +204,18 @@ def render_drivers_tab():
             license_category = st.text_input("License category")
         with col2:
             license_expiry = st.date_input("License expiry", value=None)
-        language = st.selectbox("Driver screen language", ["en", "ur"], format_func=lambda x: "English" if x == "en" else "Urdu")
+        language = st.selectbox(
+            "Driver screen language", ["en", "ur"],
+            format_func=lambda x: "English" if x == "en" else "Urdu",
+        )
+
+        authorized_names = st.multiselect("Authorized vehicles", list(vehicle_options.keys()))
+        primary_name = st.selectbox("Primary vehicle", ["None"] + list(vehicle_options.keys()))
 
         submitted = st.form_submit_button("Add + generate link")
         if submitted and name.strip():
-            add_driver(
+            primary_id = vehicle_options.get(primary_name) if primary_name != "None" else None
+            driver = add_driver(
                 name.strip(), employee_id=employee_id.strip() or None,
                 job_title=job_title.strip() or None,
                 phone_number=phone_number.strip() or None,
@@ -189,7 +224,11 @@ def render_drivers_tab():
                 license_category=license_category.strip() or None,
                 license_expiry=license_expiry,
                 language=language,
+                primary_vehicle_id=primary_id,
             )
+            if driver:
+                authorized_ids = [vehicle_options[n] for n in authorized_names]
+                set_driver_authorized_vehicles(driver["id"], authorized_ids)
             st.success("Driver added")
             st.rerun()
 
@@ -206,6 +245,13 @@ def render_drivers_tab():
         with st.expander(f"{d['name']} — {status}"):
             st.code(link)
             st.image(make_qr_bytes(link), width=180)
+
+            current_auth_ids = set(get_authorized_vehicle_ids(d["id"]))
+            current_auth_names = [name for name, vid in vehicle_options.items() if vid in current_auth_ids]
+            current_primary_id = d.get("primary_vehicle_id")
+            current_primary_name = next(
+                (name for name, vid in vehicle_options.items() if vid == current_primary_id), "None"
+            )
 
             with st.form(f"edit_driver_{d['id']}"):
                 name = st.text_input("Name", value=d.get("name") or "")
@@ -226,7 +272,18 @@ def render_drivers_tab():
                     key=f"lang_{d['id']}",
                 )
 
+                authorized_names_edit = st.multiselect(
+                    "Authorized vehicles", list(vehicle_options.keys()),
+                    default=current_auth_names, key=f"auth_{d['id']}",
+                )
+                primary_idx = (["None"] + list(vehicle_options.keys())).index(current_primary_name)
+                primary_name_edit = st.selectbox(
+                    "Primary vehicle", ["None"] + list(vehicle_options.keys()),
+                    index=primary_idx, key=f"primary_{d['id']}",
+                )
+
                 if st.form_submit_button("Save changes"):
+                    primary_id = vehicle_options.get(primary_name_edit) if primary_name_edit != "None" else None
                     update_driver(
                         d["id"], name=name.strip(), employee_id=employee_id.strip() or None,
                         job_title=job_title.strip() or None, phone_number=phone_number.strip() or None,
@@ -234,7 +291,10 @@ def render_drivers_tab():
                         license_number=license_number.strip() or None,
                         license_category=license_category.strip() or None,
                         license_expiry=license_expiry, language=language,
+                        primary_vehicle_id=primary_id,
                     )
+                    authorized_ids_edit = [vehicle_options[n] for n in authorized_names_edit]
+                    set_driver_authorized_vehicles(d["id"], authorized_ids_edit)
                     st.success("Saved")
                     st.rerun()
 
